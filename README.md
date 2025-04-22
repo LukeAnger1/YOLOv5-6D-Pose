@@ -46,6 +46,13 @@ Clone repo and install [requirements.txt](https://github.com/cviviers/YOLOv5-6D-
 [**Python>=3.9.0**](https://www.python.org/) environment, including
 [**PyTorch==1.9**](https://pytorch.org/get-started/locally/).
 
+Download conda
+https://www.anaconda.com/download/success
+Create the envinonment
+conda create -n py310 python=3.10
+Activate the environment
+conda activate py310
+
 ```bash
 git clone https://github.com/cviviers/YOLOv5-6D-Pose.git  # clone
 cd YOLOv5-6D-Pose
