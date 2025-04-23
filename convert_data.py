@@ -7,12 +7,71 @@ import matplotlib.pyplot as plt
 from PIL import Image
 import math
 
+def binary_threshold(frame, threshold=220, remove_ground=True, remove_circles=True):
+    """
+    Convert image to binary and remove ground and circular objects.
+    
+    Args:
+        frame: Input image
+        threshold: Brightness threshold for binarization
+        remove_ground: Whether to remove the ground plane
+        remove_circles: Whether to remove circular objects
+    
+    Returns:
+        Processed binary image
+    """
+    # Convert to grayscale if needed
+    if len(frame.shape) == 3:
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    else:
+        gray = frame
+    
+    # Apply threshold to get initial binary image
+    _, binary = cv2.threshold(gray, threshold, 255, cv2.THRESH_BINARY)
+    
+    # Create a copy of the binary image for processing
+    result = binary.copy()
+    
+    # Find connected components (blobs)
+    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(binary, connectivity=8)
+    
+    # Process each connected component
+    for i in range(1, num_labels):  # Skip label 0 (background)
+        x, y, w, h, area = stats[i]
+        
+        # Remove ground-like components (typically large and at the bottom of image)
+        if remove_ground and h < w * 0.5 and y > binary.shape[0] * 0.6:
+            # Likely ground if it's wide and in the bottom part of the image
+            result[labels == i] = 0
+        
+        # Remove circular objects
+        if remove_circles:
+            # Create a mask of just this component
+            component_mask = (labels == i).astype(np.uint8) * 255
+            
+            # Find contours of the component
+            contours, _ = cv2.findContours(component_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            
+            if contours:  # If contours were found
+                contour = contours[0]
+                
+                # Calculate circularity: 4π × area / perimeter²
+                perimeter = cv2.arcLength(contour, True)
+                if perimeter > 0:
+                    circularity = 4 * np.pi * area / (perimeter * perimeter)
+                    
+                    # If shape is circular (circularity close to 1)
+                    if circularity > 0.7:  # Threshold for "circular enough"
+                        result[labels == i] = 0
+    
+    return result
+
 # path to 3D model
 object_path = r"/home/rick/Desktop/nasa/yolo container/data/LINEMOD_updated_multi/LINEMOD_updated/LINEMOD/lander/lander.ply"
 # path to camera intrinsics
 camera_path = r"/home/rick/Desktop/nasa/yolo container/YOLOv5-6D-Pose/configs/linemod/linemod_camera.json"
 # Path to folder containing your images and transforms
-data_path = r"/media/rick/New Volume1/nasa/training" 
+data_path = r"/media/rick/New Volume/nasa/training" 
 # Where to store all the data
 output_path = r"/home/rick/Desktop/nasa/yolo container/data/output"
 
@@ -127,6 +186,7 @@ for file in os.listdir(data_path):
         transforms = np.load(transform_path)
         # Assuming the format is [x, y, z, qw, qx, qy, qz] or similar
         # Get the last/only row if multiple
+        print(f'the transforms are {transforms}')
         transform = transforms[-1]  
         
         # Extract translation and quaternion
@@ -135,6 +195,14 @@ for file in os.listdir(data_path):
         
         # Convert quaternion to rotation matrix
         rotation = quaternion_to_rotation_matrix(quaternion)
+
+
+        for pose in transforms:
+            translation = pose[:3]
+            quaternion = pose[3:]
+            print("Translation:", translation)
+            print("Quaternion:", quaternion)
+
 
         print(f"Translation: {translation}, Quaternion: {quaternion} and image height and width: {im_height}, {im_width}")
 
@@ -151,6 +219,9 @@ for file in os.listdir(data_path):
         
         # Create mask
         mask_arr = pose_utils.create_simple_mask(projected_vertices.T, im_width, im_height)
+        print(f'the type is {type(mask_arr)}')
+        mask_arr = binary_threshold(frame, threshold=100)
+        print(f'the type is {type(mask_arr)} after binary thresholding')
         
         # Create label
         label = pose_utils.create_label(0, projected_vertices, mtx[0,0], mtx[1,1], 
@@ -158,7 +229,7 @@ for file in os.listdir(data_path):
                                        im_width, im_height, transform_mat)
         
         # Create output filename
-        imageName = f"frame_{frame_count}.png"
+        imageName = f"{frame_count:06d}.png"
         
         # Store all information
         pose_utils.save_data(frame, mask_arr, label, imageName, output_path, im_with_bbox)

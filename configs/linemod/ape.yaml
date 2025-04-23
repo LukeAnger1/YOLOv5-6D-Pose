@@ -13,7 +13,7 @@ names : ["ape"]
 background_path: "../data/VOCdevkit/VOC2012/JPEGImages"
 coords: 18
 
-diam : 0.103
+diam : 3
 gpus : 0
 
 nc: 1  # number of classes
