@@ -1,3 +1,6 @@
+# Command to train
+# python3 train.py --batch 32 --epochs 5000 --cfg models/yolov5x_6dpose_bifpn.yaml --hyp configs/hyp.single.yaml --weights ../data/yolov5s.pt --data configs/linemod/lander.yaml --rect --cache --optimizer Adam
+
 import argparse
 import logging
 import math
@@ -84,7 +87,7 @@ def train(hyp, opt, device, tb_writer=None, wandb=None):
     if pretrained:
         with torch_distributed_zero_first(rank):
             attempt_download(weights)  # download if not found locally
-        ckpt = torch.load(weights, map_location=device)  # load checkpoint
+        ckpt = torch.load(weights, map_location=device, weights_only=False)  # load checkpoint
         if hyp.get('anchors'):
             ckpt['model'].yaml['anchors'] = round(hyp['anchors'])  # force autoanchor
         model = Model(opt.cfg or ckpt['model'].yaml, ch=3, nc=nc).to(device)  # create
@@ -199,6 +202,7 @@ def train(hyp, opt, device, tb_writer=None, wandb=None):
     gs = max(int(model.stride.max()), 32)  # grid size (max stride)
     nl = model.model[-1].nl  # number of detection layers (used for scaling hyp['obj'])
     imgsz, imgsz_test = [check_img_size(x, gs) for x in opt.img_size]  # verify imgsz are gs-multiples
+    print(f'image size here is {imgsz}, {imgsz_test}')
 
     # DP mode
     if cuda and rank == -1 and torch.cuda.device_count() > 1:
